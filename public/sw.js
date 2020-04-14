@@ -24,17 +24,41 @@ self.addEventListener('install', e => {
 //call activate event
 self.addEventListener('activate', e => {
     console.log('service worker activated');
+    e.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cache => {
+                    if(cache != cacheName){
+                        console.log('Service Worker Clearing Old Caches');
+                        return caches.delete(cache);
+                    }
+                })
+            )
+        })
+    );
 
 })
 
-// self.addEventListener('fetch', e => {
-//     console.log('fetching files');
-//     const req = e.request;
-//     const url = new URL( req.url );
+self.addEventListener('fetch', e => {
+    console.log('fetching files');
+    const req = e.request;
 
-//     if ( url.origin === location.url ) {
-//         e.respondWith( cacheFirst( req) );
-//     } else {
-//         e.respondWith( networkAndCache( req ) );
-//     }
-// })
+        e.respondWith(
+            fetch( req )
+                .then(res => {
+                    //make copy clone of response
+                    const resClone = res.clone();
+                    caches
+                        .open( cacheName )
+                        .then(cache => {
+                            cache.put( req , resClone);
+                        });
+                    return res
+                }).catch(err => caches.match( req ).then(res => res))
+        );
+})
+
+async function cacheFirst( req ){
+    const cachedResponse = await caches.match( req );
+    return cachedResponse || fetch( req );
+}
